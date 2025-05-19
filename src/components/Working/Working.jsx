@@ -2,8 +2,20 @@ import React from 'react';
 import Register from '../../assets/Register.png';
 import Apply from '../../assets/apply.png';
 import Upload from '../../assets/Upload.png';
+import { useNavigate } from 'react-router-dom';
+
 
 const Working = () => {
+
+    const navigate = useNavigate();
+  
+  
+    const handleNavigation = (path) => {
+      
+        navigate(path); // Redirect to login page
+        return;
+
+    };
   return (
     <div className="flex flex-col justify-center items-center py-12 px-4 md:px-8 w-full bg-gradient-to-b from-green-200 to-green-150">
       <h1 className="text-3xl md:text-5xl text-charcoalGray font-semibold text-center">Working Process</h1>
@@ -21,7 +33,7 @@ const Working = () => {
             className="w-28 md:w-36 border-4 border-charcoalGray rounded-full my-4 transform hover:scale-110 transition-transform duration-300"
             alt="Register"
           />
-          <h2 className="bg-softGreen text-white text-center py-3 text-lg md:text-2xl w-full rounded-md shadow-md hover:bg-green-600 transition duration-300 h-16 flex items-center justify-center">
+          <h2 className="bg-softGreen text-white text-center py-3 text-lg md:text-2xl w-full rounded-md shadow-md hover:bg-green-600 transition duration-300 h-16 flex items-center justify-center" onClick={() => handleNavigation('/register')}>
             Register Your Account
           </h2>
           <p className="text-base md:text-xl mt-4 text-center text-charcoalGray">
@@ -37,7 +49,7 @@ const Working = () => {
             className="w-28 md:w-36 border-4 border-charcoalGray rounded-full my-4 transform hover:scale-110 transition-transform duration-300"
             alt="Apply"
           />
-          <h2 className="bg-softGreen text-white text-center py-3 text-lg md:text-2xl w-full rounded-md shadow-md hover:bg-green-600 transition duration-300 h-16 flex items-center justify-center">
+          <h2 className="bg-softGreen text-white text-center py-3 text-lg md:text-2xl w-full rounded-md shadow-md hover:bg-green-600 transition duration-300 h-16 flex items-center justify-center" onClick={() => handleNavigation('/jobs')}>
             Apply For Your Dream Job
           </h2>
           <p className="text-base md:text-xl mt-4 text-center text-charcoalGray">

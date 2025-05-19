@@ -1,97 +1,369 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Save, Edit, Trash2, X, Upload, LogOut } from 'lucide-react';
+import Navbar from '../Navigation/Navbar';
 
-const ProfilePage = () => {
-  const [profilePicture, setProfilePicture] = useState(null);
-  const [resume, setResume] = useState(null);
+const ProfileSection = ({ newUserData }) => {
+  const [profile, setProfile] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    location: '',
+    profilePicture: ''
+  });
+  
   const [isEditing, setIsEditing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
-  const handleFileChange = (e) => {
-    const { name, files } = e.target;
-    if (name === 'profilePicture') {
-      setProfilePicture(files[0]);
-    } else if (name === 'resume') {
-      setResume(files[0]);
+  // Get user token from localStorage
+  const token = localStorage.getItem('authToken');
+
+  useEffect(() => {
+    // If we have newUserData from registration, use it
+    if (newUserData) {
+      setProfile({
+        ...profile,
+        firstName: newUserData.firstName || '',
+        lastName: newUserData.lastName || '',
+        email: newUserData.email || '',
+      });
+      setLoading(false);
+      setSuccessMessage('Registration successful! Welcome to your profile.');
+      setTimeout(() => setSuccessMessage(''), 5000);
+    } else if (token) {
+      fetchProfile();
+    } else {
+      setLoading(false);
+      setError('Please log in to view your profile');
+    }
+  }, [token, newUserData]);
+
+  const fetchProfile = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('http://localhost:5000/api/profile', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to fetch profile');
+      }
+      
+      const data = await response.json();
+      setProfile(data);
+      setError(null);
+    } catch (err) {
+      setError('Error loading profile: ' + err.message);
+      // If unauthorized, redirect to login
+      if (err.message.includes('401') || err.message.includes('unauthorized')) {
+        localStorage.removeItem('authToken');
+        // Redirect to login page
+        window.location.href = '/login';
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
-  const toggleEdit = () => {
-    setIsEditing(!isEditing);
+  const saveProfile = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('http://localhost:5000/api/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          firstName: profile.firstName,
+          lastName: profile.lastName,
+          phone: profile.phone,
+          location: profile.location,
+          profilePicture: profile.profilePicture
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to update profile');
+      }
+      
+      const data = await response.json();
+      setIsEditing(false);
+      setError(null);
+      setSuccessMessage('Profile updated successfully');
+      
+      // Update profile with returned data if available
+      if (data.profile) {
+        setProfile(data.profile);
+      }
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (err) {
+      setError('Error saving profile: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
+  const deleteAccount = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('http://localhost:5000/api/profile', {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to delete account');
+      }
+      
+      // Clear local storage and redirect to login
+      localStorage.removeItem('authToken');
+      window.location.href = '/register?message=account-deleted';
+      
+    } catch (err) {
+      setError('Error deleting account: ' + err.message);
+      setDeleteConfirmOpen(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Check file size (limit to 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        setError('Image size exceeds 5MB limit');
+        return;
+      }
+      
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProfile({
+          ...profile,
+          profilePicture: reader.result
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('authToken');
+    window.location.href = '/register';
+  };
+
+  if (loading && !profile.firstName) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center py-8">Loading profile...</div>
+      </div>
+    );
+  }
+
   return (
-    <div className="bg-gradient-to-r from-green-300 to-green-200 min-h-screen flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-4xl w-full p-8 transition-all duration-300 animate-fade-in">
-        <div className="flex flex-col md:flex-row">
-          <div className="md:w-1/3 text-center mb-8 md:mb-0">
-            <img
-              src={profilePicture ? URL.createObjectURL(profilePicture) : "https://i.pravatar.cc/300"}
-              alt="Profile"
-              className="rounded-full w-48 h-48 mx-auto mb-4 border-4 border-indigo-800 dark:border-blue-900 transition-transform duration-300 hover:scale-105"
-            />
-            <h1 className="text-2xl font-bold text-indigo-800 dark:text-white mb-2">John Doe</h1>
-            <p className="text-gray-600 dark:text-gray-300">Software Developer</p>
-            <button
-              onClick={toggleEdit}
-              className="mt-4 bg-indigo-800 text-white px-4 py-2 rounded-lg hover:bg-blue-900 transition-colors duration-300"
-            >
-              {isEditing ? 'Cancel' : 'Edit Profile'}
+    <div className="min-h-screen bg-gray-50 py-8 px-4">
+      <Navbar/>
+      <div className="max-w-4xl mx-auto bg-white shadow-md rounded-lg p-6">
+        {error && (
+          <div className="bg-red-50 text-red-600 p-3 mb-4 rounded-md flex justify-between">
+            <span>{error}</span>
+            <button onClick={() => setError(null)}>
+              <X className="w-4 h-4" />
             </button>
           </div>
-          <div className="md:w-2/3 md:pl-8">
-            <h2 className="text-xl font-semibold text-indigo-800 dark:text-white mb-4">About Me</h2>
-            <p className="text-gray-700 dark:text-gray-300 mb-6">
-              Passionate software developer with 5 years of experience in web technologies.
-              I love creating user-friendly applications and solving complex problems.
-            </p>
-
-            <h2 className="text-xl font-semibold text-indigo-800 dark:text-white mb-4">Skills</h2>
-            <div className="flex flex-wrap gap-2 mb-6">
-              <span className="bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full text-sm">JavaScript</span>
-              <span className="bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full text-sm">React</span>
-              <span className="bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full text-sm">Node.js</span>
-              <span className="bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full text-sm">Python</span>
-              <span className="bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full text-sm">SQL</span>
+        )}
+        
+        {successMessage && (
+          <div className="bg-green-50 text-green-600 p-3 mb-4 rounded-md flex justify-between">
+            <span>{successMessage}</span>
+            <button onClick={() => setSuccessMessage('')}>
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+        
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold">Profile</h1>
+          <div className="space-x-2 flex">
+            {isEditing ? (
+              <>
+                <button 
+                  onClick={() => setIsEditing(false)} 
+                  className="bg-gray-500 text-white px-4 py-2 rounded-md flex items-center"
+                >
+                  <X className="w-4 h-4 mr-1" /> Cancel
+                </button>
+                <button 
+                  onClick={saveProfile} 
+                  disabled={loading}
+                  className="bg-green-600 text-white px-4 py-2 rounded-md flex items-center"
+                >
+                  <Save className="w-4 h-4 mr-1" /> Save
+                </button>
+              </>
+            ) : (
+              <>
+                <button 
+                  onClick={handleLogout} 
+                  className="bg-gray-600 text-white px-4 py-2 rounded-md flex items-center"
+                >
+                  <LogOut className="w-4 h-4 mr-1" /> Logout
+                </button>
+                <button 
+                  onClick={() => setIsEditing(true)} 
+                  className="bg-blue-600 text-white px-4 py-2 rounded-md flex items-center"
+                >
+                  <Edit className="w-4 h-4 mr-1" /> Edit
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+        
+        <div className="grid md:grid-cols-3 gap-6">
+          {/* Profile Picture */}
+          <div className="md:col-span-1">
+            <div className="flex flex-col items-center">
+              <div className="w-40 h-40 rounded-full bg-gray-200 overflow-hidden mb-4">
+                {profile.profilePicture ? (
+                  <img 
+                    src={profile.profilePicture} 
+                    alt="Profile" 
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-400">
+                    No Image
+                  </div>
+                )}
+              </div>
+              
+              {isEditing && (
+                <label className="cursor-pointer bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-md flex items-center">
+                  <Upload className="w-4 h-4 mr-1" /> Upload Photo
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    className="hidden" 
+                    onChange={handleImageUpload}
+                  />
+                </label>
+              )}
             </div>
-
-            <h2 className="text-xl font-semibold text-indigo-800 dark:text-white mb-4">Contact Information</h2>
-            <ul className="space-y-2 text-gray-700 dark:text-gray-300">
-              <li className="flex items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-indigo-800 dark:text-blue-900" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                  <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
-                  <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
-                </svg>
-                john.doe@example.com
-              </li>
-              <li className="flex items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-indigo-800 dark:text-blue-900" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                  <path d="M2 3a1 1 0 011-1h2.153a1 1 001.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
-                </svg>
-                +1 (555) 123-4567
-              </li>
-              <li className="flex items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-indigo-800 dark:text-blue-900" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                  <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
-                </svg>
-                San Francisco, CA
-              </li>
-            </ul>
-
-            {isEditing && (
+          </div>
+          
+          {/* Profile Details */}
+          <div className="md:col-span-2 space-y-6">
+            {/* Basic Info */}
+            <div className="grid md:grid-cols-2 gap-4">
               <div>
-                <h2 className="text-xl font-semibold text-indigo-800 dark:text-white mb-4">Upload Profile Picture</h2>
-                <input
-                  type="file"
-                  name="profilePicture"
-                  onChange={handleFileChange}
-                  className="mb-4 p-2 border border-indigo-800 dark:border-blue-900 rounded-md"
-                />
-                <h2 className="text-xl font-semibold text-indigo-800 dark:text-white mb-4">Upload Resume</h2>
-                <input
-                  type="file"
-                  name="resume"
-                  onChange={handleFileChange}
-                  className="p-2 border border-indigo-800 dark:border-blue-900 rounded-md"
-                />
+                <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={profile.firstName || ''}
+                    onChange={(e) => setProfile({...profile, firstName: e.target.value})}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2"
+                    required
+                  />
+                ) : (
+                  <p className="text-gray-800">{profile.firstName || 'Not specified'}</p>
+                )}
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={profile.lastName || ''}
+                    onChange={(e) => setProfile({...profile, lastName: e.target.value})}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2"
+                  />
+                ) : (
+                  <p className="text-gray-800">{profile.lastName || 'Not specified'}</p>
+                )}
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <p className="text-gray-800">{profile.email || 'Not specified'}</p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                {isEditing ? (
+                  <input
+                    type="tel"
+                    value={profile.phone || ''}
+                    onChange={(e) => setProfile({...profile, phone: e.target.value})}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2"
+                  />
+                ) : (
+                  <p className="text-gray-800">{profile.phone || 'Not specified'}</p>
+                )}
+              </div>
+              
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={profile.location || ''}
+                    onChange={(e) => setProfile({...profile, location: e.target.value})}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2"
+                  />
+                ) : (
+                  <p className="text-gray-800">{profile.location || 'Not specified'}</p>
+                )}
+              </div>
+            </div>
+            
+            {/* Account Management */}
+            {isEditing && (
+              <div className="border-t pt-4 mt-4">
+                <h3 className="text-lg font-medium text-gray-700 mb-2">Account Management</h3>
+                
+                {!deleteConfirmOpen ? (
+                  <button 
+                    onClick={() => setDeleteConfirmOpen(true)} 
+                    className="bg-red-600 text-white px-4 py-2 rounded-md flex items-center"
+                  >
+                    <Trash2 className="w-4 h-4 mr-1" /> Delete Account
+                  </button>
+                ) : (
+                  <div className="bg-red-50 p-4 rounded-md">
+                    <p className="text-red-600 mb-2">Are you sure you want to delete your account? This action cannot be undone.</p>
+                    <div className="flex space-x-2">
+                      <button 
+                        onClick={() => setDeleteConfirmOpen(false)} 
+                        className="bg-gray-500 text-white px-4 py-2 rounded-md"
+                      >
+                        Cancel
+                      </button>
+                      <button 
+                        onClick={deleteAccount} 
+                        className="bg-red-600 text-white px-4 py-2 rounded-md"
+                      >
+                        Confirm Delete
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -101,4 +373,4 @@ const ProfilePage = () => {
   );
 };
 
-export default ProfilePage;
+export default ProfileSection;

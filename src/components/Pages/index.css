@@ -1,0 +1,123 @@
+import React, { useEffect, useState } from "react";
+import JobCard from "../Elements/JobCard";
+import Navbar from "../Navigation/Navbar";
+import { Link } from "react-router-dom";
+import Filter from "../Filter";
+import { AiOutlineHeart, AiFillHeart } from "react-icons/ai";
+import Job from "../../Assets/jobs.json";
+
+const experienceLevels = [
+  { min: 0, max: 1 },
+  { min: 2, max: 3 },
+  { min: 4, max: 5 },
+  { min: 5, max: 10 },
+];
+
+const FindJobsPage = () => {
+  const [jobs, setJobs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [filteredJobs, setFilteredJobs] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [active, setActive] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/jobs")
+      .then((response) => response.json())
+      .then((data) => {
+        setJobs(data);
+        setFilteredJobs(data);
+        setLoading(false);
+      })
+      .catch(() => {
+        setError("Failed to load jobs");
+        setLoading(false);
+      });
+  }, []);
+
+  const handleJobFilter = (event) => {
+    const role = event.target.innerText;
+    setFilteredJobs(jobs.filter((job) => job.role === role));
+  };
+
+  const handleExperienceFilter = (checkedState) => {
+    let filters = [];
+    checkedState.forEach((isChecked, index) => {
+      if (isChecked) {
+        filters = [
+          ...filters,
+          ...jobs.filter(
+            (job) =>
+              job.experience >= experienceLevels[index].min &&
+              job.experience <= experienceLevels[index].max
+          ),
+        ];
+      }
+    });
+    setFilteredJobs(filters.length ? filters : jobs);
+  };
+
+  const handleSearch = (event) => {
+    const term = event.target.value.toLowerCase();
+    setSearchTerm(term);
+    if (term.length > 2) {
+      setFilteredJobs(
+        jobs.filter((job) =>
+          Object.values(job).join(" ").toLowerCase().includes(term)
+        )
+      );
+    } else {
+      setFilteredJobs(jobs);
+    }
+  };
+
+  const saveJob = (job) => {
+    localStorage.setItem("savedJob", JSON.stringify(job));
+    setActive(!active);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <Navbar />
+        <div className="text-xl">Loading...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <Navbar />
+        <div className="text-xl text-red-500">{error}</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <Navbar />
+      <h1 className="text-3xl font-semibold text-center mb-8">Find Your Next Job</h1>
+      <Filter setFilteredJobs={setFilteredJobs} handleJobFilter={handleJobFilter} handleExperienceFilter={handleExperienceFilter} searchEvent={handleSearch} />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredJobs.map((job) => (
+          <div key={job.id} className="bg-white p-4 rounded-lg shadow-md">
+            <JobCard job={job} />
+            <div className="flex justify-between items-center mt-4">
+              <Link to="/apply-jobs" className="bg-blue-500 text-white px-4 py-2 rounded">Apply Now</Link>
+              <button onClick={() => saveJob(job)}>
+                {JSON.parse(localStorage.getItem("savedJob"))?.id === job.id ? (
+                  <AiFillHeart className="text-red-500" />
+                ) : (
+                  <AiOutlineHeart className="text-gray-500" />
+                )}
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+export default FindJobsPage;
